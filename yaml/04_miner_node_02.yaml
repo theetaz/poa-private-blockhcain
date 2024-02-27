@@ -1,0 +1,152 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keystore-config-miner02
+  namespace: default
+  labels:
+    app: miner
+    name: keystore-config-miner02
+data:
+  UTC--2019-06-04T13-52-48.511656735Z--4c92786b90d848eaa3f4ef46918af724a309ae79:
+    |-
+    {
+      "address": "4c92786b90d848eaa3f4ef46918af724a309ae79",
+      "crypto": {
+        "cipher": "aes-128-ctr",
+        "ciphertext": "bce6942b7494a5a1e727367f38103524c4337957505a80c7cdefa041c6f732b5",
+        "cipherparams": {
+          "iv": "cbe64393b063d05d437fb346c07874c9"
+        },
+        "kdf": "scrypt",
+        "kdfparams": {
+          "dklen": 32,
+          "n": 262144,
+          "p": 1,
+          "r": 8,
+          "salt": "492c776c50bb1e3caf02e4006838957b5fb500b22c7ef980d237f67bd5d3b8ec"
+        },
+        "mac": "97f142a72c94a828046b48f277db9a4ab3fe5048df5473b3202cc5c01a0cf6be"
+      },
+      "id": "edfd188b-2962-400e-b121-78e866e8e29e",
+      "version": 3
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: miner02-svc
+  namespace: default
+  labels:
+    app: miner
+    tier: backend
+    name: miner02-svc
+spec:
+  selector:
+    app: miner
+    tier: backend
+    name: miner02
+  ports:
+    - name: miner02-jsonrpc
+      protocol: TCP
+      port: 8545
+      targetPort: 8545
+    - name: miner02-wsrpc
+      protocol: TCP
+      port: 8546
+      targetPort: 8546
+    - name: miner02-ipc-discovery
+      protocol: TCP
+      port: 30303
+      targetPort: 30303
+    - name: miner02-dashboard
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: default
+  labels:
+    app: miner
+    tier: backend
+    name: geth-miner02
+  name: geth-miner02
+spec:
+  selector:
+    matchLabels:
+      app: miner
+  replicas: 1
+  serviceName: geth-miner02
+  template:
+    metadata:
+      name: geth-miner02
+      labels:
+        app: miner
+        tier: backend
+        name: miner02
+    spec:
+      containers:
+        - name: miner02-container
+          image: ethereum/client-go:latest
+          imagePullPolicy: Always
+          command: ["sh"]
+          args:
+            - "-cx"
+            - "/usr/local/bin/geth --datadir /etc/testnet/miner02 init /etc/geth/genesis/genesis-geth.json;
+              touch /etc/testnet/miner02/genesis_created;
+              echo 123 > /etc/testnet/miner02/password.txt;
+              mkdir -p /etc/geth/miner02;
+              ENODE='enode://b1cf29edb28dff92313ef849556bfc1718cdc0fb50b13b4b1bd0498e4bda85948bde32da4a72afc448aeb04e97cd06ae554d0612e2db718986d5e3edcb97a6a2@ethereum-bootnode-service.default.svc.cluster.local:30310';
+              /usr/local/bin/geth \
+              --datadir etc/testnet/miner02 \
+              --syncmode full \
+              --http.addr 0.0.0.0 \
+              --http.port 8545 \
+              --authrpc.port 8546 \
+              --http.api personal,eth,net,web3,txpool,miner,admin \
+              --port 30303 \
+              --http \
+              --bootnodes $ENODE \
+              --http.corsdomain '*' \
+              --networkid 123456 \
+              --miner.etherbase 0x4c92786b90d848eaa3f4ef46918af724a309ae79 \
+              --mine \
+              --verbosity 3  \
+              --unlock 0x4c92786b90d848eaa3f4ef46918af724a309ae79 --allow-insecure-unlock --password /etc/testnet/miner02/password.txt;"
+          ports:
+            - containerPort: 8545
+            - containerPort: 8546
+              protocol: UDP
+            - containerPort: 30303
+          volumeMounts:
+            - name: miner02-persistent-storage
+              mountPath: /etc/testnet/miner02
+            - name: keystore-config-persistent-storage
+              mountPath: /etc/testnet/miner02/keystore/UTC--2019-06-04T13-52-48.511656735Z--4c92786b90d848eaa3f4ef46918af724a309ae79
+              subPath: UTC--2019-06-04T13-52-48.511656735Z--4c92786b90d848eaa3f4ef46918af724a309ae79
+            - name: geth-boot-node-persistent-storage
+              mountPath: /etc/testnet/bootnode
+            - name: genesis-config-persistent-storage
+              mountPath: /etc/geth/genesis/genesis-geth.json
+              subPath: genesis-geth.json
+      volumes:
+        - name: keystore-config-persistent-storage
+          configMap:
+            name: keystore-config-miner02
+            items:
+              - key: UTC--2019-06-04T13-52-48.511656735Z--4c92786b90d848eaa3f4ef46918af724a309ae79
+                path: UTC--2019-06-04T13-52-48.511656735Z--4c92786b90d848eaa3f4ef46918af724a309ae79
+        - name: geth-boot-node-persistent-storage
+          hostPath:
+            path: /var/lib/docker/geth-storage/bootnode
+        - name: genesis-config-persistent-storage
+          configMap:
+            name: genesis-config
+            items:
+              - key: genesis-geth.json
+                path: genesis-geth.json
+        - name: miner02-persistent-storage
+          persistentVolumeClaim:
+            claimName: volume-miner02
