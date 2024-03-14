@@ -89,7 +89,7 @@ spec:
     spec:
       containers:
         - name: miner03-container
-          image: ethereum/client-go:latest
+          image: ethereum/client-go:alltools-v1.13.13
           imagePullPolicy: Always
           command: ["sh"]
           args:

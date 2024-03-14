@@ -72,5 +72,5 @@ watch -n 1 kubectl get po,svc,pv,pvc,statefulset,deployment -o wide
 
 ## Deployed services
 
-- `rpc access link` - http://143.244.203.74:8545
-- `node explorer` - http://24.144.64.220:3001
+- `rpc access link` - http://<ip_address>:8545
+- `node explorer` - http://<ip_address>:3001
